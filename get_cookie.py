@@ -1,7 +1,14 @@
+import os
+import sys
+oristdout = sys.stdout
+f = open(os.devnull, 'w')
+sys.stdout = f
+
 import toml
 from queue import Queue
 from bilibili import Bilibili
 import requests
+
 
 config_file = "config.toml"
 try:
@@ -32,4 +39,6 @@ config['user'].pop("account")
 
 instance = Bilibili(config['global']['https'], Queue())
 instance.login(force_refresh_token=False, **accounts[0])
+
+sys.stdout = oristdout
 print(requests.cookies.get_cookie_header(instance._session.cookies, requests.Request('GET', 'https://www.bilibili.com')))
