@@ -12,10 +12,9 @@ pool = "proxy.txt" # 代理池
 # 用户设置
 [user]
 update = true # 自动更新凭据
-force_refresh_token = true # 强制刷新Token
+force_refresh_token = false # 强制刷新Token
 account = """
-username=22娘;password=GodKnows;
-username=33娘;password=GodKnows;
+username=jarfsmgtg57@gmail.com;password=Aa@001122;access_token=c3a0c7bf9af79f5d8d492fec770bbf71;refresh_token=98dc35c5413c4eeb11dad2c1f9839b71;DedeUserID=626160596;DedeUserID__ckMd5=807721f539f0bde0;SESSDATA=6ed29c2e%2C1596233464%2Ccee75871;bili_jct=2374cd40f81711f440c4488b927d0fc1;sid=k956k5iq;
 """
 # 请在上方填写您的账号凭据, 每一条凭据应至少包含下述三种身份校验方式之一的完整键值对:
 # Password: username=...;password=...;
@@ -72,10 +71,14 @@ enable = false # 开关
 aid = [120040, 21322566] # 稿件av号
 
 # 关注
+[batchfollow]
+enable = false # 开关
+mid = []
+secret = false#[true, false] # 悄悄关注
+
 [follow]
 enable = false # 开关
-mid = [2, 208259] # 被关注用户UID
-secret = [true, false] # 悄悄关注
+
 
 # 弹幕发送
 [danmaku_post]

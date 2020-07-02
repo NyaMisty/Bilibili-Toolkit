@@ -36,6 +36,7 @@ import toml
 from multiprocessing import freeze_support, Manager, Pool, Process
 from selenium import webdriver
 from urllib import parse
+from itertools import zip_longest
 
 __author__ = "Hsury"
 __email__ = "i@hsury.com"
@@ -558,7 +559,8 @@ class Bilibili:
     def follow(self, mid, secret=False):
         # mid = 被关注用户UID
         # secret = 悄悄关注
-        url = f"{self.protocol}://api.bilibili.com/x/relation/modify"
+        #url = f"{self.protocol}://api.bilibili.com/x/relation/modify"
+        url = f"{self.protocol}://api.bilibili.com/x/relation/batch/modify"
         payload = {
             'fid': mid,
             'act': 3 if secret else 1,
@@ -577,6 +579,31 @@ class Bilibili:
             return True
         else:
             self._log(f"用户{mid}{'悄悄' if secret else ''}关注失败 {response}")
+            return False
+    
+    def batchfollow(self, mids, secret=False):
+        # mid = 被关注用户UID
+        # secret = 悄悄关注
+        url = f"{self.protocol}://api.bilibili.com/x/relation/batch/modify"
+        
+        payload = {
+            'fids': ','.join(map(str,[c for c in mids if c])),
+            'act': 3 if secret else 1,
+            'csrf': self.get_csrf(),
+            're_src': 222
+        }
+        print(payload)
+        headers = {
+            'Host': "api.bilibili.com",
+            #'Origin': "https://www.bilibili.com",
+            'Referer': "https://www.bilibili.com/blackboard/live/activity-NfUS01P8.html",
+        }
+        response = self._requests("post", url, data=payload, headers=headers)
+        if response and response.get("code") == 0:
+            self._log(f"批量{'悄悄' if secret else ''}关注成功 {response}")
+            return True
+        else:
+            self._log(f"批量{'悄悄' if secret else ''}关注失败 {response}")
             return False
 
     # 弹幕发送
@@ -1342,6 +1369,15 @@ def export(queue, config):
         if log_file:
             log_file.close()
 
+accmap = {}
+
+def grouper(iterable, n, fillvalue=None):
+    "Collect data into fixed-length chunks or blocks"
+    # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
+    args = [iter(iterable)] * n
+    return zip_longest(*args, fillvalue=fillvalue)
+
+
 def wrapper(arg):
     def delay_wrapper(func, interval, arg_list=[()], shuffle=False):
         if shuffle:
@@ -1352,17 +1388,24 @@ def wrapper(arg):
                 time.sleep(interval)
 
     config, account, queue = arg['config'], arg['account'], arg['queue']
-    instance = Bilibili(config['global']['https'], queue)
-    if config['proxy']['enable']:
-        if isinstance(config['proxy']['pool'], str):
-            try:
-                with open(config['proxy']['pool'], "r", encoding=detect_charset(config['proxy']['pool'])) as f:
-                    instance.set_proxy(add=[proxy for proxy in f.read().strip().splitlines() if proxy and proxy[0] != "#"])
-            except:
-                pass
-        elif isinstance(config['proxy']['pool'], list):
-            instance.set_proxy(add=config['proxy']['pool'])
-    if instance.login(force_refresh_token=config['user']['force_refresh_token'], **account):
+    ret = False
+    if account['username'] not in accmap:
+        instance = Bilibili(config['global']['https'], queue)
+        if config['proxy']['enable']:
+            if isinstance(config['proxy']['pool'], str):
+                try:
+                    with open(config['proxy']['pool'], "r", encoding=detect_charset(config['proxy']['pool'])) as f:
+                        instance.set_proxy(add=[proxy for proxy in f.read().strip().splitlines() if proxy and proxy[0] != "#"])
+                except:
+                    pass
+            elif isinstance(config['proxy']['pool'], list):
+                instance.set_proxy(add=config['proxy']['pool'])
+        if instance.login(force_refresh_token=config['user']['force_refresh_token'], **account):
+            accmap[account['username']] = instance
+            ret = True
+    else:
+        ret = True
+    if ret:
         threads = []
         if config['get_user_info']['enable']:
             threads.append(threading.Thread(target=instance.get_user_info))
@@ -1382,8 +1425,12 @@ def wrapper(arg):
             threads.append(threading.Thread(target=delay_wrapper, args=(instance.combo, 5, list(zip(config['combo']['aid'])))))
         if config['share']['enable']:
             threads.append(threading.Thread(target=delay_wrapper, args=(instance.share, 5, list(zip(config['share']['aid'])))))
+        if config['batchfollow']['enable']:
+            groups = list(grouper(config['batchfollow']['mid'], 50))
+            args = [(c, config['batchfollow']['secret']) for c in groups]
+            threads.append(threading.Thread(target=delay_wrapper, args=(instance.batchfollow, 5, args)))
         if config['follow']['enable']:
-            threads.append(threading.Thread(target=delay_wrapper, args=(instance.follow, 5, list(zip(config['follow']['mid'], config['follow']['secret'])))))
+            threads.append(threading.Thread(target=delay_wrapper, args=(instance.follow, 5, list(zip_longest(config['follow']['mid'], config['follow']['secret'])))))
         if config['danmaku_post']['enable']:
             threads.append(threading.Thread(target=delay_wrapper, args=(instance.danmaku_post, 5, list(zip(config['danmaku_post']['aid'], config['danmaku_post']['message'], config['danmaku_post']['page'], config['danmaku_post']['moment'])))))
         if config['comment_like']['enable']:
